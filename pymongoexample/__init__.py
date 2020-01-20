@@ -12,4 +12,6 @@ def create_app(config_object='pymongoexample.settings'):
 
     app.register_blueprint(main)
 
+    app.secret_key='secret123'
+
     return app
