@@ -4,6 +4,10 @@ from passlib.hash import sha256_crypt
 from functools import wraps
 from .extensions import mongo
 from datetime import datetime
+import logging
+import sys
+
+log = logging.getLogger(__name__)
 
 main = Blueprint('main', __name__)
 
@@ -41,12 +45,40 @@ def delete():
 
     return '<h1>Deleted User!</h1>'
 
+@main.route('/test')
+def test():
+        user_collection = mongo.db.users
+        user = user_collection.find_one({'name' : 'Emily'})
+        user1 = user["language"]
+        return f'<h1>user: {user1}</h1>'
+
 #------
 #Page practice
+
+# Check if user logged in
+def is_logged_in(f):
+    @wraps(f)
+    def wrap(*args, **kwargs):
+        if 'logged_in' in session:
+            return f(*args, **kwargs)
+        else:
+            flash('Unauthorized, Please login', 'danger')
+            return redirect(url_for('login'))
+    return wrap
 
 # Index
 @main.route('/')
 def index():
+    return render_template('home.html')
+
+@main.route('/debug')
+def debug():
+    log.debug('This is debug***********************')
+    log.info('This is info*')
+    log.warn('This is warn**')
+    log.fatal('This is fatal***')
+    print('This is error output', file=sys.stderr)
+    print('This is standard output', file=sys.stdout)
     return render_template('home.html')
 
 @main.route('/home')
@@ -57,10 +89,12 @@ def home():
 def about():
     return render_template('about.html')
 
-@main.route('/login')
-def login():
-    return render_template('login.html')
-
+# Dashboard
+@main.route('/dashboard')
+@is_logged_in
+def dashboard():
+        msg = 'Nothing Found'
+        return render_template('dashboard.html', msg=msg)
 
 # WTforms Register Form Class
 class RegisterForm(Form):
@@ -96,6 +130,53 @@ def register():
     return render_template('register.html', form=form)
 
 
+# WTForms User login
+
+# User login
+
+@main.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+
+        # Get Form Fields
+        username = request.form['username']
+        password_candidate = request.form['password']
+
+        # Get user by username
+        user_collection = mongo.db.users
+        user = user_collection.find_one({'name' : 'Emily'})
+        result = user_collection.count({'username' : username})
+
+        if result > 0:
+            # Get
+            user = user_collection.find_one({'username' : username})
+            password = user["password"]
+
+            # Compare Passwords
+            if sha256_crypt.verify(password_candidate, password):
+
+                # Passed
+                session['logged_in'] = True
+                session['username'] = username
+
+                flash('You are now logged in', 'success')
+                return redirect(url_for('main.dashboard'))
+            else:
+                error = 'Invalid login'
+                return render_template('login.html', error=error)
+        else:
+            error = 'Username not found'
+            return render_template('login.html', error=error)
+
+    return render_template('login.html')
+
+# Logout
+@main.route('/logout')
+@is_logged_in
+def logout():
+    session.clear()
+    flash('You are now logged out', 'success')
+    return redirect(url_for('main.login'))
 
 if __name__ == '__main__':
     main.run(debug=True)
