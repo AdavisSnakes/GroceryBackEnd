@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, flash, redirect, url_for, session, logging, request
+from flask import Blueprint,jsonify, render_template, flash, redirect, url_for, session, logging, request
 from wtforms import Form, StringField, TextAreaField, PasswordField, validators
 from passlib.hash import sha256_crypt
 from functools import wraps
@@ -11,6 +11,36 @@ log = logging.getLogger(__name__)
 
 main = Blueprint('main', __name__)
 
+
+#***********
+#api practice
+
+@main.route('/api_test')
+def api_test():
+    items = []
+    items.append({"cheese" : "1", "bread" : "white", "meat" : "steak"})
+    items.append({"1" : "1", "2" : "2", "3" : "3"})
+    return jsonify({'listTest' : items})
+
+#/add_listItem
+@main.route('/add_listItem', methods=['GET', 'POST'])
+def add_listItem():
+    data = request.get_json()
+    print('****** Item: ' + data["listItem"])
+    user_collection = mongo.db.users
+    user_collection.insert({'Item' : data["listItem"]})
+    return 'Done', 201
+
+@main.route('/returnItems')
+def returnItems():
+    returnList = []
+    user_collection = mongo.db.users
+    item = user_collection.find({'Item': {'$exists': True} })
+    for doc in item:
+        #print(doc["Item"])
+        returnList.append({'item' : str(doc["Item"])})
+    #return '<h1>test</h1>'
+    return jsonify({'itemlist' : returnList})
 
 #------
 #Database practice
