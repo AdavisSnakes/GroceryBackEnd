@@ -1,0 +1,23 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Upload CSV Recipe</title>
+  <style>
+        .validation_error{
+        color: red;
+    }
+    </style>
+</head>
+<body>
+  <form method="post" enctype="multipart/form-data">
+    {{ form.hidden_tag() }}
+    {{ form.file }}
+    <span class="validation_error">{{ ', '.join(form.file.errors) }}</span><br>
+    <input type="submit" value="Submit CSV">
+  </form>
+</body>
+</html>
+{% endblock %}

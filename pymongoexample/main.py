@@ -4,12 +4,21 @@ from passlib.hash import sha256_crypt
 from functools import wraps
 from .extensions import mongo
 from datetime import datetime
+from pymongo import MongoClient
+from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileRequired, FileAllowed
+from werkzeug import secure_filename
 import logging
 import sys
+from .parseRecipe import parseCSV, recipe
 
 log = logging.getLogger(__name__)
 
 main = Blueprint('main', __name__)
+#consumer ID 28d3f573-6c8f-4ae3-905e-a7f0f4efcd76
+
+
+#remote register
 
 
 #***********
@@ -27,30 +36,72 @@ def api_test():
 def add_listItem():
     data = request.get_json()
     print('****** Item: ' + data["listItem"])
-    user_collection = mongo.db.users
+    user_collection = mongo_user.db.users
     user_collection.insert({'Item' : data["listItem"]})
     return 'Done', 201
 
-@main.route('/returnItems')
-def returnItems():
-    returnList = []
-    user_collection = mongo.db.users
-    item = user_collection.find({'Item': {'$exists': True} })
-    for doc in item:
-        #print(doc["Item"])
-        returnList.append({'item' : str(doc["Item"])})
-    #return '<h1>test</h1>'
-    return jsonify({'itemlist' : returnList})
+@main.route('/register', methods=['POST'])
+def register():
+    data=request.get_json()
+
+    # place holders
+    user = None
+    first_name = None
+    last_name = None
+    password = None
+    date = None
+    success = False
+    testprint = "testprint"
+
+    #if all the needed fields are found
+    if 'user' and 'first name' and 'last name' and 'password' and 'email' and 'date' in data:
+        username = data['user']
+        first_name = data['first name']
+        last_name = data['last name']
+        password = data['password']
+        date = data['date']
+        success = True
+
+    # if all the fields were found
+    if success == True:
+        user_collection = mongo.db.users
+        # if the user exists
+        if(user_collection.find({'username' : username}).count()>0):
+            return {"pass" : False,"error" : "Username Exists"}
+        else:
+            user_collection.insert({
+            'username' : username,
+            'first_name' : first_name,
+            'last_name' : last_name,
+            'password' : password,
+            'date' : date
+            })
+            return {"pass" : True}
+
+    return {"pass" : False, "error" : "Missing Field"}
+
+#if db.mycollection.find({'UserIDS': { "$in": newID}}).count() > 0.
+#{
+#	"user":"test",andrew
+#	"name" : "Andrew"
+#	"password": "1234",
+#	"email" : "asdf@asdf.com"
+#	"date" : "2020-3-3-10:22.100"
+#}
 
 #------
 #Database practice
 
 @main.route('/add')
 def add():
+    #user_collection = mongo_user.db.users
+    #user_collection.insert({'name' : 'Emily', 'language' : 'Python'})
+    #user_collection.insert({'name' : 'Frank', 'language' : 'C'})
     user_collection = mongo.db.users
-    user_collection.insert({'name' : 'Emily', 'language' : 'Python'})
-    user_collection.insert({'name' : 'Frank', 'language' : 'C'})
-    return '<h1>Added a User!</h1>'
+    user_collection.insert({'name' : "user3"})
+    recipe_collection = mongo.db.users
+    recipe_collection.insert({'name' : "recipe3"})
+    return '<h1>Added a recipe!</h1>'
 
 @main.route('/find')
 def find():
@@ -75,13 +126,6 @@ def delete():
 
     return '<h1>Deleted User!</h1>'
 
-@main.route('/test')
-def test():
-        user_collection = mongo.db.users
-        user = user_collection.find_one({'name' : 'Emily'})
-        user1 = user["language"]
-        return f'<h1>user: {user1}</h1>'
-
 #------
 #Page practice
 
@@ -101,16 +145,6 @@ def is_logged_in(f):
 def index():
     return render_template('home.html')
 
-@main.route('/debug')
-def debug():
-    log.debug('This is debug***********************')
-    log.info('This is info*')
-    log.warn('This is warn**')
-    log.fatal('This is fatal***')
-    print('This is error output', file=sys.stderr)
-    print('This is standard output', file=sys.stdout)
-    return render_template('home.html')
-
 @main.route('/home')
 def home():
     return render_template('home.html')
@@ -126,7 +160,31 @@ def dashboard():
         msg = 'Nothing Found'
         return render_template('dashboard.html', msg=msg)
 
-# WTforms Register Form Class
+# Load Recipes
+class UploadForm(FlaskForm):
+    file = FileField(validators=[
+    FileRequired()#,
+    #FileAllowed('.csv', 'csv\'s only!')
+    ])
+
+# WTforms User Register
+@main.route('/loadRecipeList', methods=['GET', 'POST'])
+def loadRecipeList():
+    form = UploadForm()
+
+    if form.validate_on_submit():
+        print('*******************')
+        #print('content: \n' + form.file.data.read().decode("utf-8"), file=sys.stdout)
+        recipe = parseCSV.parse(form.file.data.read().decode("utf-8"))
+        print('recipe.ingredients[0]=' + recipe.ingredients[0])
+        print('*******************')
+        flash('You loaded the files!', 'success')
+        return redirect(url_for('main.loadRecipeList'))
+
+    return render_template('loadRecipeList.html', form=form)
+
+
+# WTforms Register Form Class - LOCAL
 class RegisterForm(Form):
     name = StringField('Name', [validators.Length(min=1, max=50)])
     username = StringField('Username', [validators.Length(min=4, max=25)])
@@ -138,9 +196,9 @@ class RegisterForm(Form):
     confirm = PasswordField('Confirm Password')
 
 
-# WTforms User Register
-@main.route('/register', methods=['GET', 'POST'])
-def register():
+# WTforms User Register - LOCAL
+@main.route('/registerLOCAL', methods=['GET', 'POST'])
+def registerLOCAL():
     form = RegisterForm(request.form)
     if request.method == 'POST' and form.validate():
         name = form.name.data
@@ -156,7 +214,7 @@ def register():
 
 
         #return redirect(url_for('index'))
-        return redirect(url_for('main.login'))
+        return redirect(url_for('main.loginLOCAL'))
     return render_template('register.html', form=form)
 
 
@@ -164,8 +222,8 @@ def register():
 
 # User login
 
-@main.route('/login', methods=['GET', 'POST'])
-def login():
+@main.route('/loginLOCAL', methods=['GET', 'POST'])
+def loginLOCAL():
     if request.method == 'POST':
 
         # Get Form Fields
@@ -210,12 +268,3 @@ def logout():
 
 if __name__ == '__main__':
     main.run(debug=True)
-
-
-#ID
-#name
-#email
-#username
-#password
-#register_date
-#
