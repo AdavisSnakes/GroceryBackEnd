@@ -1,8 +1,8 @@
 from flask import Blueprint,jsonify, render_template, flash, redirect, url_for, session, logging, request
+from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user
 from wtforms import Form, StringField, TextAreaField, PasswordField, validators
 from passlib.hash import sha256_crypt
 from functools import wraps
-from .extensions import mongo
 from datetime import datetime
 from pymongo import MongoClient
 from flask_wtf import FlaskForm
@@ -10,24 +10,22 @@ from flask_wtf.file import FileField, FileRequired, FileAllowed
 from werkzeug import secure_filename
 import logging
 import sys
+
+##
+from .extensions import mongo
 from .parseRecipe import parseCSV, recipe
 from .registerFunctions import registerClass
 from .localRegisterFunctions import localRegisterClass
 
+#
 log = logging.getLogger(__name__)
-
 main = Blueprint('main', __name__)
 
-#***********
+#User session holder
+userSessions = []
+
+#******************************************************************8
 #api
-
-@main.route('/api_test')
-def api_test():
-    items = []
-    items.append({"cheese" : "1", "bread" : "white", "meat" : "steak"})
-    items.append({"1" : "1", "2" : "2", "3" : "3"})
-    return jsonify({'listTest' : items})
-
 @main.route('/register', methods=['POST'])
 def reg():
     return registerClass.register()
@@ -36,7 +34,21 @@ def reg():
 def test():
     return registerClass.login()
 
-#------
+@main.route('/loginRequiredRoute', methods=['POST'])
+@login_required
+def loginRequiredRoute():
+    return 'loginRequiredRoute'
+
+@main.route("/logout", methods=['POST'])
+#@login_required
+def logout():
+    success = registerClass.logout
+    if(success):
+        return redirect('main.login')
+    else:
+        return {"pass" : False, "error" : "Missing Field"}
+
+#*****************************************************************
 #Database practice
 
 @main.route('/add')
@@ -70,40 +82,7 @@ def delete():
 
     return '<h1>Deleted User!</h1>'
 
-#------
-#Page practice
-
-# Check if user logged in
-def is_logged_in(f):
-    @wraps(f)
-    def wrap(*args, **kwargs):
-        if 'logged_in' in session:
-            return f(*args, **kwargs)
-        else:
-            flash('Unauthorized, Please login', 'danger')
-            return redirect(url_for('login'))
-    return wrap
-
-# Index
-@main.route('/')
-def index():
-    return render_template('home.html')
-
-@main.route('/home')
-def home():
-    return render_template('home.html')
-
-@main.route('/about')
-def about():
-    return render_template('about.html')
-
-# Dashboard
-@main.route('/dashboard')
-@is_logged_in
-def dashboard():
-        msg = 'Nothing Found'
-        return render_template('dashboard.html', msg=msg)
-
+#**************************************************************
 # Load Recipes
 class UploadForm(FlaskForm):
     file = FileField(validators=[
@@ -125,22 +104,24 @@ def loadRecipeList():
     return render_template('loadRecipeList.html', form=form)
 
 
-# WTforms User Register - LOCAL
-@main.route('/registerLOCAL', methods=['GET', 'POST'])
-def regLocal():
-    return localRegisterClass.registerLOCAL()
+# LOCAL website
+@main.route('/')
+def index():
+    return render_template('home.html')
 
-@main.route('/loginLOCAL', methods=['GET', 'POST'])
-def logLocal():
-    return localRegisterClass.loginLOCAL()
+@main.route('/home')
+def home():
+    return render_template('home.html')
 
-# Logout
-@main.route('/logout')
-@is_logged_in
-def logout():
-    session.clear()
-    flash('You are now logged out', 'success')
-    return redirect(url_for('main.login'))
+@main.route('/about')
+def about():
+    return render_template('about.html')
+
+# Dashboard
+@main.route('/dashboard')
+def dashboard():
+        msg = 'Nothing Found'
+        return render_template('dashboard.html', msg=msg)
 
 if __name__ == '__main__':
     main.run(debug=True)

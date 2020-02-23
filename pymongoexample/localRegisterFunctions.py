@@ -1,6 +1,7 @@
 from flask import Blueprint,jsonify, render_template, flash, redirect, url_for, session, logging, request
 from .extensions import mongo
-
+from wtforms import Form, StringField, TextAreaField, PasswordField, validators
+from flask_wtf import FlaskForm
 
 # WTforms Register Form Class - LOCAL
 class RegisterForm(Form):
@@ -67,12 +68,3 @@ class localRegisterClass:
                 return render_template('login.html', error=error)
 
         return render_template('login.html')
-
-#if db.mycollection.find({'UserIDS': { "$in": newID}}).count() > 0.
-#{
-#	"user":"test",andrew
-#	"name" : "Andrew"
-#	"password": "1234",
-#	"email" : "asdf@asdf.com"
-#	"date" : "2020-3-3-10:22.100"
-#}
